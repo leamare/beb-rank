@@ -2,14 +2,36 @@
 
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-app: #14101f;
+  --color-surface: #1c1730;
+  --color-surface-2: #251f3d;
+  --color-border: #33294f;
+  --color-ink: #f0edf7;
+  --color-ink-soft: #c2bbdb;
+  --color-muted: #8b83ab;
+
+  --color-accent: #9d8cf7;
+  --color-accent-soft: #6f63b8;
+
+  --color-positive: #8fa9f2;
+  --color-positive-bg: #2a3358;
+  --color-negative: #e0a0c2;
+  --color-negative-bg: #402a44;
+
+  --color-status-good: #7fd4a3;
+  --color-status-sync: #e0bd7f;
+  --color-status-bad: #e0a0a0;
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 body {
   font-family: var(--font-sans);
+  background: var(--color-app);
+  color: var(--color-ink);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: contain;
 }

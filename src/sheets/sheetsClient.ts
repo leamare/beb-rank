@@ -179,6 +179,7 @@ export async function getConfig(): Promise<Category[]> {
         emoji: r[2],
         basePoints: Number(r[3]),
         color: known?.color ?? DEFAULT_CATEGORIES[i % DEFAULT_CATEGORIES.length].color,
+        description: known?.description ?? '',
       }
     })
 }
