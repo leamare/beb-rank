@@ -18,6 +18,7 @@ interface AppState {
   logs: LogEntry[]
   syncStatus: sync.SyncStatus
   pendingCount: number
+  sheetUrl: string | null
   signIn: () => Promise<void>
   continueAsGuest: () => void
   signOut: () => void
@@ -33,12 +34,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [syncStatus, setSyncStatus] = useState<sync.SyncStatus>('idle')
   const [pendingCount, setPendingCount] = useState(0)
+  const [sheetUrl, setSheetUrl] = useState<string | null>(sheets.getSpreadsheetUrl())
 
   const refreshFromLocal = useCallback(async () => {
     const [cachedLogs, cachedConfig] = await Promise.all([db.getAllLogs(), db.getCachedConfig()])
     setLogs(cachedLogs)
     if (cachedConfig?.length) setCategories(cachedConfig)
   }, [])
+
+  const connectSheet = useCallback(async () => {
+    if (!sheets.getSpreadsheetId()) await sheets.createSpreadsheet()
+    setSheetUrl(sheets.getSpreadsheetUrl())
+    await sheets.ensureStructure()
+    await sync.pullRemote()
+    await refreshFromLocal()
+  }, [refreshFromLocal])
 
   useEffect(() => {
     const unsub = sync.onSyncChange((s) => {
@@ -61,9 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (cancelled) return
       if (signedIn) {
         setAuthStatus('signedIn')
-        await sheets.ensureStructure()
-        await sync.pullRemote()
-        await refreshFromLocal()
+        await connectSheet()
       } else {
         setAuthStatus('signedOut')
       }
@@ -72,7 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [refreshFromLocal])
+  }, [refreshFromLocal, connectSheet])
 
   useEffect(() => {
     if (authStatus !== 'signedIn') return
@@ -84,10 +92,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await auth.signIn(true)
     localStorage.removeItem(GUEST_FLAG)
     setAuthStatus('signedIn')
-    await sheets.ensureStructure()
-    await sync.pullRemote()
-    await refreshFromLocal()
-  }, [refreshFromLocal])
+    await connectSheet()
+  }, [connectSheet])
 
   const continueAsGuest = useCallback(() => {
     localStorage.setItem(GUEST_FLAG, 'true')
@@ -132,13 +138,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       logs,
       syncStatus,
       pendingCount,
+      sheetUrl,
       signIn,
       continueAsGuest,
       signOut,
       addLog,
       removeLog,
     }),
-    [authStatus, categories, logs, syncStatus, pendingCount, signIn, continueAsGuest, signOut, addLog, removeLog],
+    [
+      authStatus,
+      categories,
+      logs,
+      syncStatus,
+      pendingCount,
+      sheetUrl,
+      signIn,
+      continueAsGuest,
+      signOut,
+      addLog,
+      removeLog,
+    ],
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

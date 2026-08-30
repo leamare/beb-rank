@@ -13,7 +13,7 @@ const TABS: { key: Tab; label: string; emoji: string }[] = [
 ]
 
 function Shell() {
-  const { authStatus, signOut } = useApp()
+  const { authStatus, sheetUrl, signOut } = useApp()
   const [tab, navigate] = useHashRoute()
 
   if (authStatus === 'checking') {
@@ -29,6 +29,11 @@ function Shell() {
       <header className="flex items-center justify-between border-b border-[#e1e0d9] px-4 py-3 dark:border-[#2c2c2a]">
         <h1 className="text-base font-semibold text-[#0b0b0b] dark:text-white">🍼 Baby Management</h1>
         <div className="flex items-center gap-3">
+          {sheetUrl && (
+            <a href={sheetUrl} target="_blank" rel="noreferrer" className="text-xs text-[#898781] underline">
+              Open Sheet
+            </a>
+          )}
           <SyncStatusBadge />
           <button onClick={signOut} className="text-xs text-[#898781] underline">
             {authStatus === 'guest' ? 'Sign in' : 'Sign out'}

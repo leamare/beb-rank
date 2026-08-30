@@ -3,17 +3,32 @@ import { DEFAULT_CATEGORIES, type Category, type CategoryKey } from '../domain/c
 import type { LogEntry } from '../domain/log'
 import type { MagnitudeType } from '../domain/points'
 
-const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID as string
-const BASE = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}`
+const API_ROOT = 'https://sheets.googleapis.com/v4/spreadsheets'
+const STORAGE_KEY = 'bmc_spreadsheet_id'
 
 const LOGS_SHEET = 'Logs'
 const CONFIG_SHEET = 'Config'
 const LOGS_HEADER = ['id', 'timestamp', 'date', 'category', 'type', 'delta', 'reason']
 const CONFIG_HEADER = ['category', 'label', 'emoji', 'basePoints']
 
+let spreadsheetId: string | null = localStorage.getItem(STORAGE_KEY)
+
+export function getSpreadsheetId(): string | null {
+  return spreadsheetId
+}
+
+export function getSpreadsheetUrl(): string | null {
+  return spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit` : null
+}
+
+function setSpreadsheetId(id: string): void {
+  spreadsheetId = id
+  localStorage.setItem(STORAGE_KEY, id)
+}
+
 async function sheetsFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await ensureFreshToken()
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_ROOT}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -28,19 +43,34 @@ async function sheetsFetch(path: string, init: RequestInit = {}): Promise<Respon
   return res
 }
 
+function requireSpreadsheetId(): string {
+  if (!spreadsheetId) throw new Error('No spreadsheet connected')
+  return spreadsheetId
+}
+
+export async function createSpreadsheet(title = 'Baby Management Counter'): Promise<string> {
+  const res = await sheetsFetch('', {
+    method: 'POST',
+    body: JSON.stringify({ properties: { title } }),
+  })
+  const data = await res.json()
+  setSpreadsheetId(data.spreadsheetId)
+  return data.spreadsheetId
+}
+
 interface SheetMeta {
   sheetId: number
   title: string
 }
 
 async function getSheetsMeta(): Promise<SheetMeta[]> {
-  const res = await sheetsFetch('?fields=sheets.properties')
+  const res = await sheetsFetch(`/${requireSpreadsheetId()}?fields=sheets.properties`)
   const data = await res.json()
   return data.sheets.map((s: { properties: { sheetId: number; title: string } }) => s.properties)
 }
 
 async function addSheet(title: string): Promise<void> {
-  await sheetsFetch(':batchUpdate', {
+  await sheetsFetch(`/${requireSpreadsheetId()}:batchUpdate`, {
     method: 'POST',
     body: JSON.stringify({ requests: [{ addSheet: { properties: { title } } }] }),
   })
@@ -48,7 +78,7 @@ async function addSheet(title: string): Promise<void> {
 
 async function appendRow(range: string, row: unknown[]): Promise<void> {
   await sheetsFetch(
-    `/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    `/${requireSpreadsheetId()}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     { method: 'POST', body: JSON.stringify({ values: [row] }) },
   )
 }
@@ -78,7 +108,7 @@ async function getSheetId(title: string): Promise<number> {
 }
 
 export async function getLogs(): Promise<LogEntry[]> {
-  const res = await sheetsFetch(`/values/${LOGS_SHEET}!A2:G`)
+  const res = await sheetsFetch(`/${requireSpreadsheetId()}/values/${LOGS_SHEET}!A2:G`)
   const data = await res.json()
   const rows: string[][] = data.values ?? []
   return rows
@@ -107,14 +137,14 @@ export async function appendLog(entry: LogEntry): Promise<void> {
 }
 
 export async function deleteLogRemote(id: string): Promise<void> {
-  const res = await sheetsFetch(`/values/${LOGS_SHEET}!A2:A`)
+  const res = await sheetsFetch(`/${requireSpreadsheetId()}/values/${LOGS_SHEET}!A2:A`)
   const data = await res.json()
   const rows: string[][] = data.values ?? []
   const rowIndex = rows.findIndex((r) => r[0] === id)
   if (rowIndex === -1) return
 
   const sheetId = await getSheetId(LOGS_SHEET)
-  await sheetsFetch(':batchUpdate', {
+  await sheetsFetch(`/${requireSpreadsheetId()}:batchUpdate`, {
     method: 'POST',
     body: JSON.stringify({
       requests: [
@@ -134,7 +164,7 @@ export async function deleteLogRemote(id: string): Promise<void> {
 }
 
 export async function getConfig(): Promise<Category[]> {
-  const res = await sheetsFetch(`/values/${CONFIG_SHEET}!A2:D`)
+  const res = await sheetsFetch(`/${requireSpreadsheetId()}/values/${CONFIG_SHEET}!A2:D`)
   const data = await res.json()
   const rows: string[][] = data.values ?? []
   if (rows.length === 0) return DEFAULT_CATEGORIES

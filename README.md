@@ -2,7 +2,9 @@
 
 Installable PWA that logs point shifts across six self-management categories.
 No backend — data lives in your own Google Sheet; the app talks to the Sheets
-API directly from the browser via Google OAuth.
+API directly from the browser via Google OAuth. On first sign-in the app
+creates a new spreadsheet in your Google Drive (normal Drive file, fully
+visible/openable there) and seeds it with the tabs it needs.
 
 ## Categories
 
@@ -54,8 +56,7 @@ sign-in screen for a local-only IndexedDB mode.
 ## Deploy
 
 Pushing to `main` runs `.github/workflows/deploy.yml`, which builds and
-publishes to GitHub Pages. Add `VITE_GOOGLE_CLIENT_ID` and
-`VITE_SPREADSHEET_ID` as repo secrets first (Settings → Secrets and
-variables → Actions).
+publishes to GitHub Pages. Add `VITE_GOOGLE_CLIENT_ID` as a repo secret first
+(Settings → Secrets and variables → Actions).
 
-See [SETUP.md](./SETUP.md) for the one-time Google Cloud + Sheet setup.
+See [SETUP.md](./SETUP.md) for the one-time Google Cloud setup.

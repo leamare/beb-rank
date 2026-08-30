@@ -1,16 +1,10 @@
-# Setup: Google Cloud + Sheet
+# Setup: Google Cloud
 
-One-time setup so the app can read/write your Google Sheet directly from the
-browser (no backend involved).
+One-time setup so the app can create and sync a Google Sheet directly from
+the browser (no backend involved). You don't need to create the sheet
+yourself — the app creates it in your Drive on first sign-in.
 
-## 1. Create the Google Sheet
-
-1. Create a new blank spreadsheet at sheets.google.com.
-2. Copy its ID from the URL: `https://docs.google.com/spreadsheets/d/<THIS_PART>/edit`.
-3. Leave it empty — the app creates the `Logs` and `Config` tabs and seeds
-   default categories the first time you sign in.
-
-## 2. Create a Google Cloud OAuth Client
+## 1. Create a Google Cloud OAuth Client
 
 1. Go to console.cloud.google.com, create (or pick) a project.
 2. **APIs & Services → Library** → enable **Google Sheets API**.
@@ -26,27 +20,40 @@ browser (no backend involved).
      redirect-based OAuth)
 5. Copy the generated **Client ID**.
 
-## 3. Configure the app
+## 2. Configure the app
 
 ```
 cp .env.example .env
 ```
 
 ```
-VITE_GOOGLE_CLIENT_ID=<client id from step 2>
-VITE_SPREADSHEET_ID=<spreadsheet id from step 1>
+VITE_GOOGLE_CLIENT_ID=<client id from step 1>
 ```
 
-For GitHub Pages deploys, add the same two values as repo secrets
-(`VITE_GOOGLE_CLIENT_ID`, `VITE_SPREADSHEET_ID`) under
-**Settings → Secrets and variables → Actions** instead of committing `.env`.
+For GitHub Pages deploys, add the same value as a repo secret
+(`VITE_GOOGLE_CLIENT_ID`) under **Settings → Secrets and variables →
+Actions** instead of committing `.env`.
 
-## 4. First sign-in
+## 3. First sign-in
 
-Run the app and tap **Sign in with Google**. On success it checks the sheet
-for `Logs`/`Config` tabs and creates + seeds them if missing. From then on,
-edits made directly in the Sheet (e.g. tweaking `basePoints` in `Config`) are
-picked up on the app's next sync.
+Run the app and tap **Sign in with Google**. On first sign-in it:
+
+1. Creates a new spreadsheet titled "Baby Management Counter" in your Drive
+   (via the Sheets API — it's a normal file, shows up in Drive/Sheets UI
+   like anything else you created by hand).
+2. Creates the `Logs` and `Config` tabs and seeds default categories.
+3. Remembers the spreadsheet's ID in the browser's local storage, so it
+   reconnects to the same sheet on future visits from that browser.
+
+Tap **Open Sheet** in the app header any time to jump straight to it in
+Google Sheets. From then on, edits made directly in the Sheet (e.g. tweaking
+`basePoints` in `Config`) are picked up on the app's next sync.
+
+Signing in from a *different* browser/device creates a *separate* sheet
+(local storage doesn't sync across devices) — there's no shared "which sheet
+is mine" registry yet. If you want one shared sheet across devices, open the
+app on the first device, copy its spreadsheet ID from the Sheet's URL, and
+set it manually via the browser console: `localStorage.setItem('bmc_spreadsheet_id', '<id>')` before signing in on the second device.
 
 ## Notes
 
