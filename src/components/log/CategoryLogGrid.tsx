@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Category, CategoryKey } from '../../domain/categories'
 import { MAGNITUDE_ORDER, MAGNITUDE_VALUES, type MagnitudeType } from '../../domain/points'
+import { CategoryInfoPopover } from '../CategoryInfoPopover'
 
 interface Props {
   categories: Category[]
@@ -42,14 +43,16 @@ function MagnitudeButton({
 }
 
 export function CategoryLogGrid({ categories, totals, onRequestLog }: Props) {
-  const [openInfo, setOpenInfo] = useState<CategoryKey | null>(null)
+  const [openInfo, setOpenInfo] = useState<{ key: CategoryKey; rect: DOMRect } | null>(null)
 
   return (
     <div className="grid grid-cols-6 gap-1 sm:gap-2">
       {categories.map((c) => (
         <div key={c.key} className="relative flex min-w-0 flex-col items-center gap-1 rounded-xl border border-border bg-surface p-1 sm:gap-1.5 sm:p-2">
           <button
-            onClick={() => setOpenInfo(openInfo === c.key ? null : c.key)}
+            onClick={(e) =>
+              setOpenInfo(openInfo?.key === c.key ? null : { key: c.key, rect: e.currentTarget.getBoundingClientRect() })
+            }
             className="flex w-full flex-col items-center gap-0.5"
           >
             <span className="text-base leading-none sm:text-xl">{c.emoji}</span>
@@ -59,10 +62,8 @@ export function CategoryLogGrid({ categories, totals, onRequestLog }: Props) {
             </span>
           </button>
 
-          {openInfo === c.key && (
-            <p className="absolute left-1/2 top-full z-20 mt-1 w-36 -translate-x-1/2 rounded-lg bg-surface-2 p-2 text-center text-[10px] leading-snug text-ink-soft shadow-lg">
-              {c.description}
-            </p>
+          {openInfo?.key === c.key && (
+            <CategoryInfoPopover category={c} anchorRect={openInfo.rect} onClose={() => setOpenInfo(null)} />
           )}
 
           <div className="flex w-full flex-col gap-1">

@@ -3,6 +3,8 @@ import { useApp } from '../../state/AppContext'
 import { CategoryTrendChart } from '../charts/CategoryTrendChart'
 import { CalendarHeatmap } from '../charts/CalendarHeatmap'
 import { SignificantShifts } from '../charts/SignificantShifts'
+import { CategoryInfoPopover } from '../CategoryInfoPopover'
+import type { CategoryKey } from '../../domain/categories'
 import { dailySeries, lastNDates } from '../../domain/dailyTotals'
 
 const RANGES = [7, 30, 90]
@@ -10,6 +12,7 @@ const RANGES = [7, 30, 90]
 export function DynamicsTab() {
   const { categories, logs } = useApp()
   const [days, setDays] = useState(30)
+  const [openInfo, setOpenInfo] = useState<{ key: CategoryKey; rect: DOMRect } | null>(null)
 
   const averages = useMemo(() => {
     const dates = lastNDates(days)
@@ -42,15 +45,28 @@ export function DynamicsTab() {
         <h2 className="mb-2 text-sm font-medium text-muted">Average end-of-day standing</h2>
         <div className="grid grid-cols-3 gap-2">
           {categories.map((c) => (
-            <div key={c.key} className="rounded-xl border border-border bg-surface p-3 text-center">
+            <button
+              key={c.key}
+              onClick={(e) =>
+                setOpenInfo(openInfo?.key === c.key ? null : { key: c.key, rect: e.currentTarget.getBoundingClientRect() })
+              }
+              className="rounded-xl border border-border bg-surface p-3 text-center"
+            >
               <div className="text-lg">{c.emoji}</div>
               <div className="text-lg font-semibold" style={{ color: c.color }}>
                 {averages[c.key]}
               </div>
               <div className="text-[10px] text-muted">{c.label}</div>
-            </div>
+            </button>
           ))}
         </div>
+        {openInfo &&
+          (() => {
+            const c = categories.find((cat) => cat.key === openInfo.key)
+            return c ? (
+              <CategoryInfoPopover category={c} anchorRect={openInfo.rect} onClose={() => setOpenInfo(null)} />
+            ) : null
+          })()}
       </section>
 
       <section>

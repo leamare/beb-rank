@@ -24,7 +24,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
     emoji: '🧠',
     basePoints: DEFAULT_BASE_POINTS,
     color: '#3987e5',
-    description: 'Staying mentally present and stable — handling overwhelm, keeping emotional outbursts in check.',
+    description:
+      'Staying mentally present and stable — handling overwhelm, keeping emotional outbursts in check, staying focused instead of brainrotting.',
   },
   {
     key: 'capable',
