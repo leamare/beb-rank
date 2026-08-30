@@ -25,7 +25,7 @@ export function RecentLogsList({ logs, categories, limit = 8, onDelete }: Props)
     .slice(0, limit)
 
   if (recent.length === 0) {
-    return <p className="text-sm text-[#898781]">No logs yet.</p>
+    return <p className="text-sm text-muted">No logs yet.</p>
   }
 
   return (
@@ -35,25 +35,25 @@ export function RecentLogsList({ logs, categories, limit = 8, onDelete }: Props)
         return (
           <li
             key={log.id}
-            className="flex items-start justify-between gap-3 rounded-lg border border-[#e1e0d9] px-3 py-2 text-sm dark:border-[#2c2c2a]"
+            className="flex items-start justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
           >
             <div className="flex items-start gap-2">
               <span className="text-lg leading-none">{cat?.emoji ?? '•'}</span>
               <div>
-                <div className="text-[#0b0b0b] dark:text-white">
+                <div className="text-ink">
                   {cat?.label ?? log.category}{' '}
-                  <span className={log.delta > 0 ? 'text-[#006300]' : 'text-[#e34948]'}>
+                  <span className={log.delta > 0 ? 'text-positive' : 'text-negative'}>
                     {log.delta > 0 ? '+' : ''}
                     {log.delta}
                   </span>
                 </div>
-                {log.reason && <div className="text-xs text-[#898781]">{log.reason}</div>}
+                {log.reason && <div className="text-xs text-muted">{log.reason}</div>}
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <span className="whitespace-nowrap text-xs text-[#898781]">{timeAgo(log.timestamp)}</span>
+              <span className="whitespace-nowrap text-xs text-muted">{timeAgo(log.timestamp)}</span>
               {onDelete && (
-                <button onClick={() => onDelete(log.id)} className="text-xs text-[#898781] underline">
+                <button onClick={() => onDelete(log.id)} className="text-xs text-muted underline">
                   undo
                 </button>
               )}

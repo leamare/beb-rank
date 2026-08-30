@@ -29,8 +29,8 @@ export function DynamicsTab() {
           <button
             key={r}
             onClick={() => setDays(r)}
-            className={`rounded-full px-3 py-1 text-xs ${
-              days === r ? 'bg-[#2a78d6] text-white' : 'border border-[#c3c2b7] text-[#52514e] dark:text-[#c3c2b7]'
+            className={`rounded-full px-3 py-1 text-xs transition-colors ${
+              days === r ? 'bg-accent text-white' : 'border border-border text-ink-soft hover:bg-surface'
             }`}
           >
             {r}d
@@ -39,32 +39,32 @@ export function DynamicsTab() {
       </div>
 
       <section>
-        <h2 className="mb-2 text-sm font-medium text-[#898781]">Average end-of-day standing</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted">Average end-of-day standing</h2>
         <div className="grid grid-cols-3 gap-2">
           {categories.map((c) => (
-            <div key={c.key} className="rounded-xl border border-[#e1e0d9] p-3 text-center dark:border-[#2c2c2a]">
+            <div key={c.key} className="rounded-xl border border-border bg-surface p-3 text-center">
               <div className="text-lg">{c.emoji}</div>
               <div className="text-lg font-semibold" style={{ color: c.color }}>
                 {averages[c.key]}
               </div>
-              <div className="text-[10px] text-[#898781]">{c.label}</div>
+              <div className="text-[10px] text-muted">{c.label}</div>
             </div>
           ))}
         </div>
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-medium text-[#898781]">Trend</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted">Trend</h2>
         <CategoryTrendChart logs={logs} categories={categories} days={days} />
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-medium text-[#898781]">Calendar</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted">Calendar</h2>
         <CalendarHeatmap logs={logs} categories={categories} />
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-medium text-[#898781]">Most significant shifts</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted">Most significant shifts</h2>
         <SignificantShifts logs={logs} categories={categories} />
       </section>
     </div>

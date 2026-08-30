@@ -29,7 +29,7 @@ export function LogTab() {
           value={date}
           max={todayKey()}
           onChange={(e) => setDate(e.target.value)}
-          className="rounded-lg border border-[#c3c2b7] bg-transparent px-2 py-1 text-sm text-[#0b0b0b] dark:text-white"
+          className="rounded-lg border border-border bg-transparent px-2 py-1 text-sm text-ink"
         />
         <button
           onClick={() => setDate(shiftDate(date, 1))}
@@ -44,7 +44,7 @@ export function LogTab() {
         {categories.map((c) => (
           <span
             key={c.key}
-            className="flex items-center gap-1 rounded-full border border-[#e1e0d9] px-2 py-1 text-xs dark:border-[#2c2c2a]"
+            className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs"
           >
             {c.emoji} <span style={{ color: c.color }}>{totals[c.key]}</span>
           </span>

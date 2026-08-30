@@ -43,11 +43,17 @@ export function CalendarHeatmap({ logs, categories }: Props) {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="px-2 text-lg">
+        <button
+          onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+          className="rounded px-2 text-lg text-ink-soft hover:bg-surface"
+        >
           ‹
         </button>
-        <span className="text-sm font-medium text-[#0b0b0b] dark:text-white">{monthLabel}</span>
-        <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="px-2 text-lg">
+        <span className="text-sm font-medium text-ink">{monthLabel}</span>
+        <button
+          onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+          className="rounded px-2 text-lg text-ink-soft hover:bg-surface"
+        >
           ›
         </button>
       </div>
@@ -55,7 +61,7 @@ export function CalendarHeatmap({ logs, categories }: Props) {
       <select
         value={filter}
         onChange={(e) => setFilter(e.target.value as CategoryKey | 'all')}
-        className="mb-3 rounded-lg border border-[#c3c2b7] bg-transparent px-2 py-1 text-xs text-[#0b0b0b] dark:text-white"
+        className="mb-3 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-ink"
       >
         <option value="all">All categories</option>
         {categories.map((c) => (
@@ -65,7 +71,7 @@ export function CalendarHeatmap({ logs, categories }: Props) {
         ))}
       </select>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-[#898781]">
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted">
         {WEEKDAYS.map((w, i) => (
           <div key={i}>{w}</div>
         ))}
@@ -73,12 +79,18 @@ export function CalendarHeatmap({ logs, categories }: Props) {
           cell.date === null ? (
             <div key={i} />
           ) : (
-            <div
-              key={i}
-              title={`${cell.date}: ${cell.value > 0 ? '+' : ''}${cell.value}`}
-              className={`aspect-square rounded-md ${cell.date === today ? 'ring-1 ring-[#2a78d6]' : ''}`}
-              style={{ background: divergingColor(cell.value, scaleMax) }}
-            />
+            <div key={i} className="group relative aspect-square">
+              <div
+                className={`h-full w-full rounded-md transition-transform group-hover:scale-110 ${
+                  cell.date === today ? 'ring-1 ring-accent' : ''
+                }`}
+                style={{ background: divergingColor(cell.value, scaleMax) }}
+              />
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-surface-2 px-2 py-1 text-[10px] text-ink opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                {cell.date} · {cell.value > 0 ? '+' : ''}
+                {cell.value}
+              </div>
+            </div>
           ),
         )}
       </div>

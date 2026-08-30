@@ -31,12 +31,12 @@ export function MainTab() {
   return (
     <div className="flex flex-col gap-6 p-4">
       <section>
-        <h2 className="mb-2 text-sm font-medium text-[#898781]">Today's standings</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted">Today's standings</h2>
         <CategoryLogGrid categories={categories} totals={totals} onRequestLog={requestLog} />
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-medium text-[#898781]">Recent</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted">Recent</h2>
         <RecentLogsList logs={logs} categories={categories} onDelete={(id) => void removeLog(id)} />
       </section>
 
