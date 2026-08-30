@@ -90,11 +90,11 @@ export function getAccessToken(): string | null {
 }
 
 /**
- * interactive=true may show Google UI if a session/consent isn't already
- * present (prompt: ''); interactive=false never shows UI and just fails if
- * a silent refresh isn't possible (prompt: 'none').
+ * Must be called from a real user gesture (click) — Google's token popup/
+ * iframe can be silently blocked by the browser otherwise, leaving the
+ * returned promise pending forever with no callback ever firing.
  */
-export async function signIn(interactive = true): Promise<string> {
+export async function signIn(): Promise<string> {
   await ensureTokenClient()
   return new Promise((resolve, reject) => {
     tokenClient = window.google!.accounts.oauth2.initTokenClient({
@@ -114,23 +114,19 @@ export async function signIn(interactive = true): Promise<string> {
         resolve(resp.access_token)
       },
     })
-    tokenClient.requestAccessToken({ prompt: interactive ? '' : 'none' })
+    tokenClient.requestAccessToken({ prompt: '' })
   })
 }
 
-export async function trySilentSignIn(): Promise<boolean> {
-  if (isSignedIn()) return true
-  try {
-    await signIn(false)
-    return true
-  } catch {
-    return false
-  }
-}
-
+/**
+ * No network/GIS call — just checks the persisted access token. There is no
+ * safe way to auto-renew without a click: GIS's token client never hands out
+ * a refresh token (those must stay on a confidential backend), so once the
+ * ~1hr access token expires the only path back is an explicit sign-in.
+ */
 export async function ensureFreshToken(): Promise<string> {
   if (isSignedIn()) return tokenState!.accessToken
-  return signIn(false)
+  throw new Error('Not signed in')
 }
 
 export function signOut(): void {

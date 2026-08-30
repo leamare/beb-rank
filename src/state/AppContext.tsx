@@ -76,11 +76,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setAuthStatus('guest')
         return
       }
-      const signedIn = await auth.trySilentSignIn()
-      if (cancelled) return
-      if (signedIn) {
+      if (auth.isSignedIn()) {
         setAuthStatus('signedIn')
-        await connectSheet()
+        try {
+          await connectSheet()
+        } catch (err) {
+          console.error('connectSheet failed', err)
+        }
       } else {
         setAuthStatus('signedOut')
       }
@@ -98,7 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [authStatus])
 
   const signIn = useCallback(async () => {
-    await auth.signIn(true)
+    await auth.signIn()
     localStorage.removeItem(GUEST_FLAG)
     setAuthStatus('signedIn')
     await connectSheet()
