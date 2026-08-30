@@ -2,8 +2,8 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig(({ mode }) => {
-  const base = process.env.VITE_BASE || (mode === 'production' ? '/baby-management/' : '/')
+export default defineConfig(() => {
+  const base = process.env.VITE_BASE || '/'
 
   return {
     base,
