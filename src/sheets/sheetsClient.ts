@@ -26,6 +26,11 @@ function setSpreadsheetId(id: string): void {
   localStorage.setItem(STORAGE_KEY, id)
 }
 
+export function forgetSpreadsheet(): void {
+  spreadsheetId = null
+  localStorage.removeItem(STORAGE_KEY)
+}
+
 async function sheetsFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await ensureFreshToken()
   const res = await fetch(`${API_ROOT}${path}`, {

@@ -81,9 +81,7 @@ export function CalendarHeatmap({ logs, categories }: Props) {
           ) : (
             <div key={i} className="group relative aspect-square">
               <div
-                className={`h-full w-full rounded-md transition-transform group-hover:scale-110 ${
-                  cell.date === today ? 'ring-1 ring-accent' : ''
-                }`}
+                className={`h-full w-full rounded-md ${cell.date === today ? 'ring-1 ring-accent' : ''}`}
                 style={{ background: divergingColor(cell.value, scaleMax) }}
               />
               <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-surface-2 px-2 py-1 text-[10px] text-ink opacity-0 shadow-lg transition-opacity group-hover:opacity-100">

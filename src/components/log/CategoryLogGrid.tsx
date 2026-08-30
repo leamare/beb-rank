@@ -45,22 +45,22 @@ export function CategoryLogGrid({ categories, totals, onRequestLog }: Props) {
   const [openInfo, setOpenInfo] = useState<CategoryKey | null>(null)
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="grid grid-cols-6 gap-1 sm:gap-2">
       {categories.map((c) => (
-        <div key={c.key} className="flex w-20 flex-shrink-0 flex-col items-center gap-1.5 rounded-xl border border-border bg-surface p-2">
+        <div key={c.key} className="relative flex min-w-0 flex-col items-center gap-1 rounded-xl border border-border bg-surface p-1 sm:gap-1.5 sm:p-2">
           <button
             onClick={() => setOpenInfo(openInfo === c.key ? null : c.key)}
-            className="flex flex-col items-center gap-0.5"
+            className="flex w-full flex-col items-center gap-0.5"
           >
-            <span className="text-xl leading-none">{c.emoji}</span>
-            <span className="text-[10px] font-medium text-ink-soft">{c.label}</span>
-            <span className="text-base font-semibold" style={{ color: c.color }}>
+            <span className="text-base leading-none sm:text-xl">{c.emoji}</span>
+            <span className="hidden truncate text-[10px] font-medium text-ink-soft sm:block">{c.label}</span>
+            <span className="text-sm font-semibold sm:text-base" style={{ color: c.color }}>
               {totals[c.key]}
             </span>
           </button>
 
           {openInfo === c.key && (
-            <p className="rounded-lg bg-surface-2 p-1.5 text-center text-[10px] leading-snug text-ink-soft">
+            <p className="absolute left-1/2 top-full z-20 mt-1 w-36 -translate-x-1/2 rounded-lg bg-surface-2 p-2 text-center text-[10px] leading-snug text-ink-soft shadow-lg">
               {c.description}
             </p>
           )}

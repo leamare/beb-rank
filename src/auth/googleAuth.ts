@@ -1,6 +1,7 @@
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 const SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
+const STORAGE_KEY = 'bmc_token'
 
 declare global {
   interface Window {
@@ -24,7 +25,23 @@ interface TokenState {
   expiresAt: number
 }
 
-let tokenState: TokenState | null = null
+function loadPersistedToken(): TokenState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as TokenState
+    return parsed.expiresAt > Date.now() ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function persistToken(state: TokenState | null): void {
+  if (state) localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  else localStorage.removeItem(STORAGE_KEY)
+}
+
+let tokenState: TokenState | null = loadPersistedToken()
 let tokenClient: ReturnType<NonNullable<Window['google']>['accounts']['oauth2']['initTokenClient']> | null = null
 let gisLoadPromise: Promise<void> | null = null
 
@@ -72,8 +89,13 @@ export function getAccessToken(): string | null {
   return isSignedIn() ? tokenState!.accessToken : null
 }
 
+/**
+ * interactive=true may show Google UI if a session/consent isn't already
+ * present (prompt: ''); interactive=false never shows UI and just fails if
+ * a silent refresh isn't possible (prompt: 'none').
+ */
 export async function signIn(interactive = true): Promise<string> {
-  const client = await ensureTokenClient()
+  await ensureTokenClient()
   return new Promise((resolve, reject) => {
     tokenClient = window.google!.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
@@ -87,16 +109,17 @@ export async function signIn(interactive = true): Promise<string> {
           accessToken: resp.access_token,
           expiresAt: Date.now() + (resp.expires_in ?? 3600) * 1000 - 30_000,
         }
+        persistToken(tokenState)
         notify()
         resolve(resp.access_token)
       },
     })
-    tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' })
-    void client
+    tokenClient.requestAccessToken({ prompt: interactive ? '' : 'none' })
   })
 }
 
 export async function trySilentSignIn(): Promise<boolean> {
+  if (isSignedIn()) return true
   try {
     await signIn(false)
     return true
@@ -113,6 +136,7 @@ export async function ensureFreshToken(): Promise<string> {
 export function signOut(): void {
   const token = tokenState?.accessToken
   tokenState = null
+  persistToken(null)
   notify()
   if (token && window.google) {
     window.google.accounts.oauth2.revoke(token, () => {})
