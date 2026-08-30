@@ -1,32 +1,61 @@
-# React + TypeScript + Vite
+# Baby Management Counter
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Installable PWA that logs point shifts across six self-management categories.
+No backend — data lives in your own Google Sheet; the app talks to the Sheets
+API directly from the browser via Google OAuth.
 
-Currently, two official plugins are available:
+## Categories
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Category | Emoji | Tracks |
+|---|---|---|
+| Mental | 🧠 | Mental capacity, staying grounded, emotional control |
+| Capable | 🧩 | Handling basic tasks self-sufficiently |
+| Tidy | 🧹 | Hygiene, clean environment, order vs. mess |
+| Listening | 👂 | Holding a real conversation, not self-centered |
+| Aware | 👀 | Noticing what's happening around you |
+| Compliant | ✅ | Following through on what's asked |
 
-## React Compiler
+Each starts the day at a base of 50 points (editable per category in the
+`Config` sheet tab).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Point scale
 
-## Expanding the Oxlint configuration
+| Type | Value | Reason required |
+|---|---|---|
+| Minor | ±1 | no |
+| Stronger | ±2 | no |
+| Major | ±5 | yes |
+| Massive | ±10 | yes |
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Tabs
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+- **Main** — today's standing per category, log buttons, recent entries
+- **Log** — full log for any day, date-navigable
+- **Dynamics** — trend chart, calendar heatmap, average end-of-day standing, most significant shifts
+
+## Stack
+
+Vite + React + TypeScript + Tailwind v4, `vite-plugin-pwa`, `idb` (offline
+cache + pending write queue), `recharts`. Sync is append-only: logs push to
+Sheets as they're created and pull back on load/focus/interval, so hand-edits
+made directly in the Sheet are picked up too.
+
+## Develop
+
+```
+npm install
+cp .env.example .env   # fill in after following SETUP.md
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Works without Google credentials too — pick "Continue without sync" on the
+sign-in screen for a local-only IndexedDB mode.
+
+## Deploy
+
+Pushing to `main` runs `.github/workflows/deploy.yml`, which builds and
+publishes to GitHub Pages. Add `VITE_GOOGLE_CLIENT_ID` and
+`VITE_SPREADSHEET_ID` as repo secrets first (Settings → Secrets and
+variables → Actions).
+
+See [SETUP.md](./SETUP.md) for the one-time Google Cloud + Sheet setup.
