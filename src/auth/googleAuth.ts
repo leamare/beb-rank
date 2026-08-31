@@ -85,6 +85,13 @@ export function isSignedIn(): boolean {
   return !!tokenState && tokenState.expiresAt > Date.now()
 }
 
+/** True if this device has ever signed in before, even if the token is now
+ * expired — used to decide whether a silent-renew attempt is worth the cost
+ * at boot, vs. a genuinely fresh device that's never granted access. */
+export function hasPriorSession(): boolean {
+  return localStorage.getItem(STORAGE_KEY) !== null
+}
+
 export function getAccessToken(): string | null {
   return isSignedIn() ? tokenState!.accessToken : null
 }
@@ -164,7 +171,6 @@ export async function silentRenew(): Promise<boolean> {
                 expiresAt: Date.now() + (resp.expires_in ?? 3600) * 1000 - 30_000,
               }
               persistToken(tokenState)
-              notify()
               resolve(true)
             },
           })
@@ -180,6 +186,9 @@ export async function silentRenew(): Promise<boolean> {
   try {
     return await renewing
   } finally {
+    // Notify either way — a failed renewal after the token had already
+    // expired still needs listeners to see the current (signed-out) state.
+    notify()
     renewing = null
   }
 }

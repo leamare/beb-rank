@@ -185,7 +185,11 @@ async function pullRemoteNow(): Promise<LogEntry[]> {
 }
 
 async function tick(): Promise<void> {
-  if (navigator.onLine && isSignedIn() && msUntilExpiry() < RENEW_BEFORE_MS) {
+  // Renew proactively before expiry, but also retry after it's already
+  // expired — background tabs get throttled hard enough (especially on
+  // mobile) that the proactive check can easily get skipped entirely while
+  // backgrounded, in which case this is the only thing that ever tries again.
+  if (navigator.onLine && (!isSignedIn() || msUntilExpiry() < RENEW_BEFORE_MS)) {
     await silentRenew()
   }
   await flushPending()
