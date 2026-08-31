@@ -120,13 +120,68 @@ export async function signIn(): Promise<string> {
 
 /**
  * No network/GIS call — just checks the persisted access token. There is no
- * safe way to auto-renew without a click: GIS's token client never hands out
- * a refresh token (those must stay on a confidential backend), so once the
- * ~1hr access token expires the only path back is an explicit sign-in.
+ * way to auto-renew from cold storage: GIS's token client never hands out a
+ * refresh token (those must stay on a confidential backend), so if the
+ * ~1hr access token has already expired the only path back is signIn().
+ * silentRenew() below covers the common case (renewing *before* it expires,
+ * while the app is open) so this cold-expiry path is rarely hit in practice.
  */
 export async function ensureFreshToken(): Promise<string> {
   if (isSignedIn()) return tokenState!.accessToken
   throw new Error('Not signed in')
+}
+
+export function msUntilExpiry(): number {
+  return tokenState ? tokenState.expiresAt - Date.now() : -Infinity
+}
+
+let renewing: Promise<boolean> | null = null
+
+/**
+ * Renews the token before it expires, while the app is open — unlike a cold
+ * boot, prompt: 'none' here is guaranteed non-interactive (silent hidden
+ * iframe, fails fast) rather than potentially-interactive, so it can't hang
+ * or flash a popup the way an automatic '' prompt could. Guarded by a
+ * timeout as a last-resort safety net regardless.
+ */
+export async function silentRenew(): Promise<boolean> {
+  if (renewing) return renewing
+  renewing = (async () => {
+    try {
+      await ensureTokenClient()
+      const result = await Promise.race([
+        new Promise<boolean>((resolve) => {
+          tokenClient = window.google!.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPE,
+            callback: (resp) => {
+              if (resp.error || !resp.access_token) {
+                resolve(false)
+                return
+              }
+              tokenState = {
+                accessToken: resp.access_token,
+                expiresAt: Date.now() + (resp.expires_in ?? 3600) * 1000 - 30_000,
+              }
+              persistToken(tokenState)
+              notify()
+              resolve(true)
+            },
+          })
+          tokenClient.requestAccessToken({ prompt: 'none' })
+        }),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 8_000)),
+      ])
+      return result
+    } catch {
+      return false
+    }
+  })()
+  try {
+    return await renewing
+  } finally {
+    renewing = null
+  }
 }
 
 export function signOut(): void {

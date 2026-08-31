@@ -1,7 +1,9 @@
 import * as db from '../db/localDb'
 import * as sheets from '../sheets/sheetsClient'
-import { isSignedIn } from '../auth/googleAuth'
+import { isSignedIn, msUntilExpiry, silentRenew } from '../auth/googleAuth'
 import type { LogEntry } from '../domain/log'
+
+const RENEW_BEFORE_MS = 10 * 60 * 1000
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error'
 
@@ -87,15 +89,25 @@ export async function pullRemote(): Promise<LogEntry[]> {
   }
 }
 
+async function tick(): Promise<void> {
+  if (navigator.onLine && isSignedIn() && msUntilExpiry() < RENEW_BEFORE_MS) {
+    await silentRenew()
+  }
+  await flushPending()
+  await pullRemote()
+}
+
 export function startBackgroundSync(intervalMs = 60_000): () => void {
-  const tick = () => void flushPending().then(() => pullRemote())
-  const interval = setInterval(tick, intervalMs)
-  window.addEventListener('online', tick)
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') tick()
-  })
+  const run = () => void tick()
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') run()
+  }
+  const interval = setInterval(run, intervalMs)
+  window.addEventListener('online', run)
+  document.addEventListener('visibilitychange', onVisible)
   return () => {
     clearInterval(interval)
-    window.removeEventListener('online', tick)
+    window.removeEventListener('online', run)
+    document.removeEventListener('visibilitychange', onVisible)
   }
 }
