@@ -1,10 +1,8 @@
 import * as db from '../db/localDb'
 import * as sheets from '../sheets/sheetsClient'
-import { isSignedIn, msUntilExpiry, silentRenew } from '../auth/googleAuth'
+import { isSignedIn, recheckSignedIn } from '../auth/googleAuth'
 import type { LogEntry } from '../domain/log'
 import type { PendingAction } from '../db/localDb'
-
-const RENEW_BEFORE_MS = 10 * 60 * 1000
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error'
 
@@ -184,38 +182,29 @@ async function pullRemoteNow(): Promise<LogEntry[]> {
   }
 }
 
-async function maybeRenew(): Promise<void> {
-  if (navigator.onLine && (!isSignedIn() || msUntilExpiry() < RENEW_BEFORE_MS)) {
-    await silentRenew()
-  }
-}
-
 async function syncOnly(): Promise<void> {
+  // No automatic token renewal here, ever — GIS's "silent" prompt: 'none'
+  // isn't reliably silent in every browser/cookie configuration, and any
+  // automatic call risked flashing a real popup at an arbitrary moment while
+  // the tab sat idle in the background. Sessions now simply expire after
+  // their natural ~1hr and require one deliberate click to continue — no
+  // surprise windows, ever, at the cost of not lasting indefinitely.
+  recheckSignedIn() // no network call — just re-broadcasts current expiry state so the UI updates promptly
   await flushPending()
   await pullRemote()
 }
 
-async function renewThenSync(): Promise<void> {
-  // Only called from a moment tied to the user actually being at the app
-  // (foreground return, reconnect) — a plain interval firing this while
-  // backgrounded and idle is what caused GIS to flash a visible window every
-  // minute or so, since prompt: 'none' isn't reliably silent in every
-  // browser/cookie configuration despite what the docs promise.
-  await maybeRenew()
-  await syncOnly()
-}
-
 export function startBackgroundSync(intervalMs = 60_000): () => void {
+  const run = () => void syncOnly()
   const onVisible = () => {
-    if (document.visibilityState === 'visible') void renewThenSync()
+    if (document.visibilityState === 'visible') run()
   }
-  const onOnline = () => void renewThenSync()
-  const interval = setInterval(() => void syncOnly(), intervalMs)
-  window.addEventListener('online', onOnline)
+  const interval = setInterval(run, intervalMs)
+  window.addEventListener('online', run)
   document.addEventListener('visibilitychange', onVisible)
   return () => {
     clearInterval(interval)
-    window.removeEventListener('online', onOnline)
+    window.removeEventListener('online', run)
     document.removeEventListener('visibilitychange', onVisible)
   }
 }

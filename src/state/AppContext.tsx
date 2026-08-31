@@ -93,14 +93,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setAuthStatus('guest')
         return
       }
-      // Token may have expired while the app was fully closed (no timers run
-      // then) — try one silent renewal before falling back to the sign-in
-      // gate. Only worth attempting if this device has signed in before.
-      if (!auth.isSignedIn() && auth.hasPriorSession()) {
-        await auth.silentRenew()
-      }
-      if (cancelled) return
-
       if (auth.isSignedIn()) {
         setAuthStatus('signedIn')
         try {

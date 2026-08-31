@@ -85,11 +85,11 @@ export function isSignedIn(): boolean {
   return !!tokenState && tokenState.expiresAt > Date.now()
 }
 
-/** True if this device has ever signed in before, even if the token is now
- * expired — used to decide whether a silent-renew attempt is worth the cost
- * at boot, vs. a genuinely fresh device that's never granted access. */
-export function hasPriorSession(): boolean {
-  return localStorage.getItem(STORAGE_KEY) !== null
+/** No network call — just re-broadcasts the current expiry state to
+ * listeners, so the UI notices a natural time-based expiry promptly instead
+ * of only finding out when some API call happens to fail. */
+export function recheckSignedIn(): void {
+  notify()
 }
 
 export function getAccessToken(): string | null {
@@ -127,70 +127,17 @@ export async function signIn(): Promise<string> {
 
 /**
  * No network/GIS call — just checks the persisted access token. There is no
- * way to auto-renew from cold storage: GIS's token client never hands out a
- * refresh token (those must stay on a confidential backend), so if the
- * ~1hr access token has already expired the only path back is signIn().
- * silentRenew() below covers the common case (renewing *before* it expires,
- * while the app is open) so this cold-expiry path is rarely hit in practice.
+ * way to auto-renew: GIS's token client never hands out a refresh token
+ * (those must stay on a confidential backend), and any automatic call to
+ * request one — even with prompt: 'none', which is documented as silent —
+ * has been observed to flash a real popup in some browser/cookie
+ * configurations. So this deliberately never tries to renew on its own: once
+ * the ~1hr access token expires, the only path back is an explicit signIn()
+ * click, which is a real user gesture and therefore safe to show UI for.
  */
 export async function ensureFreshToken(): Promise<string> {
   if (isSignedIn()) return tokenState!.accessToken
   throw new Error('Not signed in')
-}
-
-export function msUntilExpiry(): number {
-  return tokenState ? tokenState.expiresAt - Date.now() : -Infinity
-}
-
-let renewing: Promise<boolean> | null = null
-
-/**
- * Renews the token before it expires, while the app is open — unlike a cold
- * boot, prompt: 'none' here is guaranteed non-interactive (silent hidden
- * iframe, fails fast) rather than potentially-interactive, so it can't hang
- * or flash a popup the way an automatic '' prompt could. Guarded by a
- * timeout as a last-resort safety net regardless.
- */
-export async function silentRenew(): Promise<boolean> {
-  if (renewing) return renewing
-  renewing = (async () => {
-    try {
-      await ensureTokenClient()
-      const result = await Promise.race([
-        new Promise<boolean>((resolve) => {
-          tokenClient = window.google!.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPE,
-            callback: (resp) => {
-              if (resp.error || !resp.access_token) {
-                resolve(false)
-                return
-              }
-              tokenState = {
-                accessToken: resp.access_token,
-                expiresAt: Date.now() + (resp.expires_in ?? 3600) * 1000 - 30_000,
-              }
-              persistToken(tokenState)
-              resolve(true)
-            },
-          })
-          tokenClient.requestAccessToken({ prompt: 'none' })
-        }),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 8_000)),
-      ])
-      return result
-    } catch {
-      return false
-    }
-  })()
-  try {
-    return await renewing
-  } finally {
-    // Notify either way — a failed renewal after the token had already
-    // expired still needs listeners to see the current (signed-out) state.
-    notify()
-    renewing = null
-  }
 }
 
 /**

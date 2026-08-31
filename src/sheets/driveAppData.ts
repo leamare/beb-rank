@@ -1,4 +1,4 @@
-import { ensureFreshToken, invalidateIfScopeError } from '../auth/googleAuth'
+import { ensureFreshToken } from '../auth/googleAuth'
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files'
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files'
@@ -12,7 +12,10 @@ async function driveFetch(url: string, init: RequestInit = {}): Promise<Response
   })
   if (!res.ok) {
     const body = await res.text()
-    invalidateIfScopeError(res.status, body)
+    // Deliberately doesn't invalidate the session on a scope error here —
+    // this marker file is a cross-device convenience, not core functionality.
+    // Nuking an otherwise-valid Sheets-scoped token just because this one
+    // call lacks the Drive scope would force a re-login on every connect.
     throw new Error(`Drive API ${res.status}: ${body}`)
   }
   return res

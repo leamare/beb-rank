@@ -115,31 +115,50 @@ export async function ensureStructure(): Promise<void> {
 /**
  * The spreadsheet ID lives in a hidden marker file in the signed-in account's
  * Drive app-data folder — not just local storage — so every device signed
- * into the same Google account converges on the same sheet.
+ * into the same Google account converges on the same sheet. This is
+ * best-effort: if Drive access isn't available for any reason (missing
+ * scope, network issue), fall back to whatever's cached locally, or create a
+ * fresh sheet — cross-device convergence is a nice-to-have, not something
+ * that should block getting a working sheet at all.
  */
 async function resolveSpreadsheetId(): Promise<string> {
-  const marked = await readMarkedSpreadsheetId()
-  if (marked) {
-    setSpreadsheetId(marked)
-    return marked
+  try {
+    const marked = await readMarkedSpreadsheetId()
+    if (marked) {
+      setSpreadsheetId(marked)
+      return marked
+    }
+  } catch {
+    const cached = getSpreadsheetId()
+    if (cached) return cached
   }
+
   const created = await createSpreadsheet()
-  // Race guard: another device may have written a marker in the time it took
-  // to create this sheet. Re-check and defer to whichever one landed first
-  // instead of blindly overwriting it.
-  const recheck = await readMarkedSpreadsheetId()
-  if (recheck) {
-    setSpreadsheetId(recheck)
-    return recheck
+  try {
+    // Race guard: another device may have written a marker in the time it took
+    // to create this sheet. Re-check and defer to whichever one landed first
+    // instead of blindly overwriting it.
+    const recheck = await readMarkedSpreadsheetId()
+    if (recheck) {
+      setSpreadsheetId(recheck)
+      return recheck
+    }
+    await writeMarkedSpreadsheetId(created)
+  } catch {
+    // Drive marker unavailable — this device just won't auto-discover a
+    // sheet another device already created. Still fully functional locally.
   }
-  await writeMarkedSpreadsheetId(created)
   return created
 }
 
 export async function switchToSpreadsheet(id: string): Promise<void> {
   setSpreadsheetId(id)
   await ensureStructure()
-  await writeMarkedSpreadsheetId(id)
+  try {
+    await writeMarkedSpreadsheetId(id)
+  } catch {
+    // best-effort — see resolveSpreadsheetId
+  }
 }
 
 export async function connect(): Promise<void> {
