@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 
-export type Tab = 'main' | 'log' | 'dynamics'
+export type Tab = 'main' | 'log' | 'dynamics' | 'settings'
 
 function parseHash(): Tab {
   const hash = window.location.hash.replace('#/', '')
-  if (hash === 'log' || hash === 'dynamics') return hash
+  if (hash === 'log' || hash === 'dynamics' || hash === 'settings') return hash
   return 'main'
 }
 

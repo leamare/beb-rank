@@ -22,7 +22,7 @@ export function getSpreadsheetUrl(): string | null {
   return spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit` : null
 }
 
-function setSpreadsheetId(id: string): void {
+export function setSpreadsheetId(id: string): void {
   spreadsheetId = id
   localStorage.setItem(STORAGE_KEY, id)
 }
@@ -119,8 +119,22 @@ async function resolveSpreadsheetId(): Promise<string> {
     return marked
   }
   const created = await createSpreadsheet()
+  // Race guard: another device may have written a marker in the time it took
+  // to create this sheet. Re-check and defer to whichever one landed first
+  // instead of blindly overwriting it.
+  const recheck = await readMarkedSpreadsheetId()
+  if (recheck) {
+    setSpreadsheetId(recheck)
+    return recheck
+  }
   await writeMarkedSpreadsheetId(created)
   return created
+}
+
+export async function switchToSpreadsheet(id: string): Promise<void> {
+  setSpreadsheetId(id)
+  await ensureStructure()
+  await writeMarkedSpreadsheetId(id)
 }
 
 export async function connect(): Promise<void> {
@@ -221,4 +235,28 @@ export async function getConfig(): Promise<Category[]> {
         description: known?.description ?? '',
       }
     })
+}
+
+export async function updateConfig(categories: Category[]): Promise<void> {
+  const res = await sheetsFetch(`/${requireSpreadsheetId()}/values/${CONFIG_SHEET}!A2:D`)
+  const data = await res.json()
+  const rows: string[][] = data.values ?? []
+
+  const updates = categories
+    .map((c) => {
+      const rowIndex = rows.findIndex((r) => r[0] === c.key)
+      if (rowIndex === -1) return null
+      const rowNumber = rowIndex + 2
+      return {
+        range: `${CONFIG_SHEET}!A${rowNumber}:D${rowNumber}`,
+        values: [[c.key, c.label, c.emoji, c.basePoints]],
+      }
+    })
+    .filter((u): u is { range: string; values: (string | number)[][] } => u !== null)
+
+  if (updates.length === 0) return
+  await sheetsFetch(`/${requireSpreadsheetId()}/values:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({ valueInputOption: 'RAW', data: updates }),
+  })
 }

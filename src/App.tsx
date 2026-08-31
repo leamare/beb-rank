@@ -4,12 +4,14 @@ import { SyncStatusBadge } from './components/SyncStatusBadge'
 import { MainTab } from './components/tabs/MainTab'
 import { LogTab } from './components/tabs/LogTab'
 import { DynamicsTab } from './components/tabs/DynamicsTab'
+import { SettingsTab } from './components/tabs/SettingsTab'
 import { useHashRoute, type Tab } from './hooks/useHashRoute'
 
 const TABS: { key: Tab; label: string; emoji: string }[] = [
   { key: 'main', label: 'Main', emoji: '🏠' },
   { key: 'log', label: 'Log', emoji: '📋' },
   { key: 'dynamics', label: 'Dynamics', emoji: '📈' },
+  { key: 'settings', label: 'Settings', emoji: '⚙️' },
 ]
 
 function Shell() {
@@ -45,6 +47,7 @@ function Shell() {
         {tab === 'main' && <MainTab />}
         {tab === 'log' && <LogTab />}
         {tab === 'dynamics' && <DynamicsTab />}
+        {tab === 'settings' && <SettingsTab />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-border bg-surface">

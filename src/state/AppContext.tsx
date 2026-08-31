@@ -24,6 +24,13 @@ interface AppState {
   signOut: () => void
   addLog: (category: CategoryKey, type: MagnitudeType, sign: 1 | -1, reason: string) => Promise<void>
   removeLog: (id: string) => Promise<void>
+  updateCategories: (updated: Category[]) => Promise<void>
+  switchSheet: (idOrUrl: string) => Promise<void>
+}
+
+function extractSpreadsheetId(idOrUrl: string): string {
+  const match = idOrUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
+  return match ? match[1] : idOrUrl.trim()
 }
 
 const AppContext = createContext<AppState | null>(null)
@@ -142,6 +149,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refreshFromLocal],
   )
 
+  const updateCategories = useCallback(
+    async (updated: Category[]) => {
+      setCategories(updated)
+      await db.setCachedConfig(updated)
+      if (authStatus === 'signedIn') {
+        await sheets.updateConfig(updated)
+      }
+    },
+    [authStatus],
+  )
+
+  const switchSheet = useCallback(
+    async (idOrUrl: string) => {
+      const id = extractSpreadsheetId(idOrUrl)
+      await sheets.switchToSpreadsheet(id)
+      setSheetUrl(sheets.getSpreadsheetUrl())
+      await sync.pullRemote()
+      await refreshFromLocal()
+    },
+    [refreshFromLocal],
+  )
+
   const value = useMemo<AppState>(
     () => ({
       authStatus,
@@ -155,6 +184,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signOut,
       addLog,
       removeLog,
+      updateCategories,
+      switchSheet,
     }),
     [
       authStatus,
@@ -168,6 +199,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signOut,
       addLog,
       removeLog,
+      updateCategories,
+      switchSheet,
     ],
   )
 
