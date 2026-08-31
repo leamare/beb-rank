@@ -184,29 +184,38 @@ async function pullRemoteNow(): Promise<LogEntry[]> {
   }
 }
 
-async function tick(): Promise<void> {
-  // Renew proactively before expiry, but also retry after it's already
-  // expired — background tabs get throttled hard enough (especially on
-  // mobile) that the proactive check can easily get skipped entirely while
-  // backgrounded, in which case this is the only thing that ever tries again.
+async function maybeRenew(): Promise<void> {
   if (navigator.onLine && (!isSignedIn() || msUntilExpiry() < RENEW_BEFORE_MS)) {
     await silentRenew()
   }
+}
+
+async function syncOnly(): Promise<void> {
   await flushPending()
   await pullRemote()
 }
 
+async function renewThenSync(): Promise<void> {
+  // Only called from a moment tied to the user actually being at the app
+  // (foreground return, reconnect) — a plain interval firing this while
+  // backgrounded and idle is what caused GIS to flash a visible window every
+  // minute or so, since prompt: 'none' isn't reliably silent in every
+  // browser/cookie configuration despite what the docs promise.
+  await maybeRenew()
+  await syncOnly()
+}
+
 export function startBackgroundSync(intervalMs = 60_000): () => void {
-  const run = () => void tick()
   const onVisible = () => {
-    if (document.visibilityState === 'visible') run()
+    if (document.visibilityState === 'visible') void renewThenSync()
   }
-  const interval = setInterval(run, intervalMs)
-  window.addEventListener('online', run)
+  const onOnline = () => void renewThenSync()
+  const interval = setInterval(() => void syncOnly(), intervalMs)
+  window.addEventListener('online', onOnline)
   document.addEventListener('visibilitychange', onVisible)
   return () => {
     clearInterval(interval)
-    window.removeEventListener('online', run)
+    window.removeEventListener('online', onOnline)
     document.removeEventListener('visibilitychange', onVisible)
   }
 }
