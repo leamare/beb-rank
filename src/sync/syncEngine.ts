@@ -45,7 +45,23 @@ export async function deleteLog(id: string): Promise<void> {
   void flushPending()
 }
 
-export async function flushPending(): Promise<void> {
+let flushInFlight: Promise<void> | null = null
+
+/**
+ * Guarded against overlapping calls — the interval tick, the 'online' event,
+ * visibilitychange, and the direct call right after logging a point can all
+ * fire close together. Without this, two overlapping runs could both see the
+ * same pending entry (removed only after success) and append it twice.
+ */
+export function flushPending(): Promise<void> {
+  if (flushInFlight) return flushInFlight
+  flushInFlight = flushPendingNow().finally(() => {
+    flushInFlight = null
+  })
+  return flushInFlight
+}
+
+async function flushPendingNow(): Promise<void> {
   if (!navigator.onLine || !isSignedIn()) {
     await setState({ status: navigator.onLine ? state.status : 'offline' })
     return
@@ -97,7 +113,18 @@ async function pushLocalOnly(remoteLogs: LogEntry[]): Promise<void> {
   }
 }
 
-export async function pullRemote(): Promise<LogEntry[]> {
+let pullInFlight: Promise<LogEntry[]> | null = null
+
+/** Same overlapping-calls concern as flushPending — see its comment. */
+export function pullRemote(): Promise<LogEntry[]> {
+  if (pullInFlight) return pullInFlight
+  pullInFlight = pullRemoteNow().finally(() => {
+    pullInFlight = null
+  })
+  return pullInFlight
+}
+
+async function pullRemoteNow(): Promise<LogEntry[]> {
   if (!navigator.onLine || !isSignedIn()) return db.getAllLogs()
 
   await setState({ status: 'syncing' })

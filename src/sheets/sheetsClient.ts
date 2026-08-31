@@ -200,15 +200,23 @@ export async function deleteLogRemote(id: string): Promise<void> {
   const res = await sheetsFetch(`/${requireSpreadsheetId()}/values/${LOGS_SHEET}!A2:A`)
   const data = await res.json()
   const rows: string[][] = data.values ?? []
-  const rowIndex = rows.findIndex((r) => r[0] === id)
-  if (rowIndex === -1) return
+  // Delete every row matching this id, not just the first — duplicate rows
+  // can exist from overlapping sync passes, and "undo" should clear all of them.
+  const rowIndices = rows.reduce<number[]>((acc, r, i) => {
+    if (r[0] === id) acc.push(i)
+    return acc
+  }, [])
+  if (rowIndices.length === 0) return
 
   const sheetId = await getSheetId(LOGS_SHEET)
   await sheetsFetch(`/${requireSpreadsheetId()}:batchUpdate`, {
     method: 'POST',
     body: JSON.stringify({
-      requests: [
-        {
+      // Highest row index first so deleting one doesn't shift the position
+      // of the others still queued for deletion in this same batch.
+      requests: rowIndices
+        .sort((a, b) => b - a)
+        .map((rowIndex) => ({
           deleteDimension: {
             range: {
               sheetId,
@@ -217,8 +225,7 @@ export async function deleteLogRemote(id: string): Promise<void> {
               endIndex: rowIndex + 2,
             },
           },
-        },
-      ],
+        })),
     }),
   })
 }
