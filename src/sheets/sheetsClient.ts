@@ -153,6 +153,13 @@ export async function connect(): Promise<void> {
   }
 }
 
+export async function clearLogs(): Promise<void> {
+  await sheetsFetch(`/${requireSpreadsheetId()}/values/${LOGS_SHEET}!A2:G:clear`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
 async function getSheetId(title: string): Promise<number> {
   const sheets = await getSheetsMeta()
   const sheet = sheets.find((s) => s.title === title)

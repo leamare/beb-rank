@@ -3,7 +3,7 @@ import { useApp } from '../../state/AppContext'
 import { DEFAULT_BASE_POINTS } from '../../domain/categories'
 
 export function SettingsTab() {
-  const { authStatus, categories, sheetUrl, updateCategories, switchSheet } = useApp()
+  const { authStatus, categories, sheetUrl, updateCategories, switchSheet, resetDatabase } = useApp()
   const [values, setValues] = useState<Record<string, number>>(() =>
     Object.fromEntries(categories.map((c) => [c.key, c.basePoints])),
   )
@@ -12,6 +12,7 @@ export function SettingsTab() {
   const [sheetInput, setSheetInput] = useState('')
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState<string | null>(null)
+  const [resetting, setResetting] = useState(false)
 
   const dirty = categories.some((c) => values[c.key] !== c.basePoints)
 
@@ -41,6 +42,20 @@ export function SettingsTab() {
       setSwitchError(err instanceof Error ? err.message : 'Could not switch sheet')
     } finally {
       setSwitching(false)
+    }
+  }
+
+  async function handleResetDatabase() {
+    const warning =
+      authStatus === 'signedIn'
+        ? 'Delete every logged point on this device AND in the connected Google Sheet? This cannot be undone.'
+        : 'Delete every logged point on this device? This cannot be undone.'
+    if (!window.confirm(warning)) return
+    setResetting(true)
+    try {
+      await resetDatabase()
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -118,6 +133,21 @@ export function SettingsTab() {
           {saving ? 'Saving…' : saved ? 'Saved' : 'Save'}
         </button>
       </div>
+
+      <section>
+        <h2 className="mb-2 text-sm font-medium text-negative">Danger zone</h2>
+        <p className="mb-3 text-xs text-muted">
+          Wipes every logged point{authStatus === 'signedIn' ? ' on this device and in the connected sheet' : ''}.
+          Baseline points above are kept.
+        </p>
+        <button
+          onClick={() => void handleResetDatabase()}
+          disabled={resetting}
+          className="w-full rounded-lg border border-negative py-2 text-sm font-medium text-negative transition-colors hover:bg-negative-bg disabled:opacity-40"
+        >
+          {resetting ? 'Resetting…' : 'Reset database'}
+        </button>
+      </section>
     </div>
   )
 }

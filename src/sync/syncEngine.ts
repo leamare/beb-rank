@@ -73,6 +73,30 @@ export async function flushPending(): Promise<void> {
   await refreshPendingCount()
 }
 
+/**
+ * Pushes local entries the remote sheet doesn't have yet, beyond whatever's
+ * still in the pending queue. Needed because "pending" only tracks entries
+ * this device hasn't confirmed sending — it says nothing about entries this
+ * device already sent to a *different* sheet before switching (e.g. two
+ * devices that each had their own sheet before reconnecting to a shared
+ * one). Without this, those entries stay stuck local-only forever.
+ */
+async function pushLocalOnly(remoteLogs: LogEntry[]): Promise<void> {
+  const remoteIds = new Set(remoteLogs.map((l) => l.id))
+  const pending = await db.getPending()
+  const pendingIds = new Set(pending.map((p) => (p.kind === 'append' ? p.entry.id : p.entryId)))
+  const localLogs = await db.getAllLogs()
+  const missing = localLogs.filter((l) => !remoteIds.has(l.id) && !pendingIds.has(l.id))
+
+  for (const entry of missing) {
+    try {
+      await sheets.appendLog(entry)
+    } catch {
+      // leave it for the next reconciliation pass
+    }
+  }
+}
+
 export async function pullRemote(): Promise<LogEntry[]> {
   if (!navigator.onLine || !isSignedIn()) return db.getAllLogs()
 
@@ -81,6 +105,7 @@ export async function pullRemote(): Promise<LogEntry[]> {
     const [logs, config] = await Promise.all([sheets.getLogs(), sheets.getConfig()])
     await db.putLogs(logs)
     await db.setCachedConfig(config)
+    await pushLocalOnly(logs)
     await setState({ status: 'idle' })
     return db.getAllLogs()
   } catch {

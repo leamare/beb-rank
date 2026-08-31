@@ -69,6 +69,12 @@ export async function removePending(id: string): Promise<void> {
   await (await getDb()).delete('pending', id)
 }
 
+export async function clearAllLogs(): Promise<void> {
+  const db = await getDb()
+  await db.clear('logs')
+  await db.clear('pending')
+}
+
 export async function getMeta<T>(key: string): Promise<T | undefined> {
   return (await getDb()).get('meta', key) as Promise<T | undefined>
 }

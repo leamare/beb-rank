@@ -26,6 +26,7 @@ interface AppState {
   removeLog: (id: string) => Promise<void>
   updateCategories: (updated: Category[]) => Promise<void>
   switchSheet: (idOrUrl: string) => Promise<void>
+  resetDatabase: () => Promise<void>
 }
 
 function extractSpreadsheetId(idOrUrl: string): string {
@@ -171,6 +172,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refreshFromLocal],
   )
 
+  const resetDatabase = useCallback(async () => {
+    await db.clearAllLogs()
+    setLogs([])
+    if (authStatus === 'signedIn') {
+      await sheets.clearLogs()
+    }
+  }, [authStatus])
+
   const value = useMemo<AppState>(
     () => ({
       authStatus,
@@ -186,6 +195,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       removeLog,
       updateCategories,
       switchSheet,
+      resetDatabase,
     }),
     [
       authStatus,
@@ -201,6 +211,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       removeLog,
       updateCategories,
       switchSheet,
+      resetDatabase,
     ],
   )
 
