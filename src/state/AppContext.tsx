@@ -43,17 +43,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const connectSheet = useCallback(async () => {
-    if (!sheets.getSpreadsheetId()) await sheets.createSpreadsheet()
-    try {
-      await sheets.ensureStructure()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : ''
-      if (!message.includes('404')) throw err
-      // Previously connected sheet no longer exists (e.g. deleted in Drive) — start fresh.
-      sheets.forgetSpreadsheet()
-      await sheets.createSpreadsheet()
-      await sheets.ensureStructure()
-    }
+    await sheets.connect()
     setSheetUrl(sheets.getSpreadsheetUrl())
     await sync.pullRemote()
     await refreshFromLocal()

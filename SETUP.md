@@ -7,7 +7,9 @@ yourself — the app creates it in your Drive on first sign-in.
 ## 1. Create a Google Cloud OAuth Client
 
 1. Go to console.cloud.google.com, create (or pick) a project.
-2. **APIs & Services → Library** → enable **Google Sheets API**.
+2. **APIs & Services → Library** → enable **Google Sheets API** and
+   **Google Drive API** (Drive is used only for a tiny hidden marker file
+   that remembers which spreadsheet is "yours" across devices — see below).
 3. **APIs & Services → OAuth consent screen** → configure it (External is
    fine for personal use; add your own Google account as a test user if the
    app stays in "Testing" mode).
@@ -42,18 +44,22 @@ Run the app and tap **Sign in with Google**. On first sign-in it:
    (via the Sheets API — it's a normal file, shows up in Drive/Sheets UI
    like anything else you created by hand).
 2. Creates the `Logs` and `Config` tabs and seeds default categories.
-3. Remembers the spreadsheet's ID in the browser's local storage, so it
-   reconnects to the same sheet on future visits from that browser.
+3. Remembers the spreadsheet's ID in a small hidden file in your Google
+   Drive's app-data folder (not a visible Drive file, just an app-private
+   note tied to your account) — so any other device you sign into with the
+   *same Google account* finds and reuses that same sheet instead of
+   creating its own.
 
 Tap **Open Sheet** in the app header any time to jump straight to it in
 Google Sheets. From then on, edits made directly in the Sheet (e.g. tweaking
 `basePoints` in `Config`) are picked up on the app's next sync.
 
-Signing in from a *different* browser/device creates a *separate* sheet
-(local storage doesn't sync across devices) — there's no shared "which sheet
-is mine" registry yet. If you want one shared sheet across devices, open the
-app on the first device, copy its spreadsheet ID from the Sheet's URL, and
-set it manually via the browser console: `localStorage.setItem('bmc_spreadsheet_id', '<id>')` before signing in on the second device.
+**Migrating from before this was added:** if you already used the app on
+two devices before this fix, each one created its own separate sheet.
+Whichever device signs in first (after picking up this update) creates the
+shared marker and becomes the sheet every device uses from then on — the
+other device's prior sheet is orphaned. Manually copy any rows you want to
+keep from the orphaned sheet's `Logs` tab into the surviving one.
 
 ## Notes
 

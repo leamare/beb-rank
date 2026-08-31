@@ -1,4 +1,5 @@
 import { ensureFreshToken } from '../auth/googleAuth'
+import { readMarkedSpreadsheetId, writeMarkedSpreadsheetId } from './driveAppData'
 import { DEFAULT_CATEGORIES, type Category, type CategoryKey } from '../domain/categories'
 import type { LogEntry } from '../domain/log'
 import type { MagnitudeType } from '../domain/points'
@@ -102,6 +103,38 @@ export async function ensureStructure(): Promise<void> {
     for (const c of DEFAULT_CATEGORIES) {
       await appendRow(`${CONFIG_SHEET}!A1`, [c.key, c.label, c.emoji, c.basePoints])
     }
+  }
+}
+
+/**
+ * The spreadsheet ID lives in a hidden marker file in the signed-in account's
+ * Drive app-data folder — not just local storage — so every device signed
+ * into the same Google account converges on the same sheet.
+ */
+async function resolveSpreadsheetId(): Promise<string> {
+  const marked = await readMarkedSpreadsheetId()
+  if (marked) {
+    setSpreadsheetId(marked)
+    return marked
+  }
+  const created = await createSpreadsheet()
+  await writeMarkedSpreadsheetId(created)
+  return created
+}
+
+export async function connect(): Promise<void> {
+  await resolveSpreadsheetId()
+  try {
+    await ensureStructure()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ''
+    if (!message.includes('404')) throw err
+    // Marked sheet no longer exists (e.g. deleted in Drive) — replace it and
+    // update the shared marker so other devices pick up the new one too.
+    forgetSpreadsheet()
+    const created = await createSpreadsheet()
+    await writeMarkedSpreadsheetId(created)
+    await ensureStructure()
   }
 }
 
