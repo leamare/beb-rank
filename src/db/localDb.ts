@@ -53,6 +53,17 @@ export async function putLogs(entries: LogEntry[]): Promise<void> {
   await tx.done
 }
 
+/** Replaces the entire logs store with exactly this set — used to make the
+ * local cache mirror the remote sheet (including remote deletions), rather
+ * than only ever growing via upserts. */
+export async function replaceAllLogs(entries: LogEntry[]): Promise<void> {
+  const db = await getDb()
+  const tx = db.transaction('logs', 'readwrite')
+  await tx.store.clear()
+  await Promise.all(entries.map((e) => tx.store.put(e)))
+  await tx.done
+}
+
 export async function deleteLogLocal(id: string): Promise<void> {
   await (await getDb()).delete('logs', id)
 }

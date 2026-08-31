@@ -84,9 +84,14 @@ async function addSheet(title: string): Promise<void> {
 }
 
 async function appendRow(range: string, row: unknown[]): Promise<void> {
+  await appendRows(range, [row])
+}
+
+async function appendRows(range: string, rows: unknown[][]): Promise<void> {
+  if (rows.length === 0) return
   await sheetsFetch(
     `/${requireSpreadsheetId()}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-    { method: 'POST', body: JSON.stringify({ values: [row] }) },
+    { method: 'POST', body: JSON.stringify({ values: rows }) },
   )
 }
 
@@ -171,8 +176,12 @@ export async function getLogs(): Promise<LogEntry[]> {
   const res = await sheetsFetch(`/${requireSpreadsheetId()}/values/${LOGS_SHEET}!A2:G`)
   const data = await res.json()
   const rows: string[][] = data.values ?? []
+  // Sheets omits trailing empty cells from each row, so a log with no
+  // `reason` (the common case — only major/massive entries have one) comes
+  // back shorter than 7 columns. Require only the columns that are always
+  // populated, not the full width.
   return rows
-    .filter((r) => r.length >= 7 && r[0])
+    .filter((r) => r.length >= 6 && r[0])
     .map((r) => ({
       id: r[0],
       timestamp: r[1],
@@ -184,8 +193,8 @@ export async function getLogs(): Promise<LogEntry[]> {
     }))
 }
 
-export async function appendLog(entry: LogEntry): Promise<void> {
-  await appendRow(`${LOGS_SHEET}!A1`, [
+export async function appendLogs(entries: LogEntry[]): Promise<void> {
+  const rows = entries.map((entry) => [
     entry.id,
     entry.timestamp,
     entry.date,
@@ -194,16 +203,19 @@ export async function appendLog(entry: LogEntry): Promise<void> {
     entry.delta,
     entry.reason,
   ])
+  await appendRows(`${LOGS_SHEET}!A1`, rows)
 }
 
-export async function deleteLogRemote(id: string): Promise<void> {
+export async function deleteLogsRemote(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
   const res = await sheetsFetch(`/${requireSpreadsheetId()}/values/${LOGS_SHEET}!A2:A`)
   const data = await res.json()
   const rows: string[][] = data.values ?? []
-  // Delete every row matching this id, not just the first — duplicate rows
-  // can exist from overlapping sync passes, and "undo" should clear all of them.
+  const idSet = new Set(ids)
+  // Delete every row matching any of these ids, not just the first —
+  // duplicate rows can exist from overlapping sync passes.
   const rowIndices = rows.reduce<number[]>((acc, r, i) => {
-    if (r[0] === id) acc.push(i)
+    if (idSet.has(r[0])) acc.push(i)
     return acc
   }, [])
   if (rowIndices.length === 0) return

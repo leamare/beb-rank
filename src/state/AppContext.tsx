@@ -66,6 +66,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    // Background sync (interval/online/visibility triggers) updates
+    // IndexedDB directly without going through addLog/removeLog/connectSheet
+    // — without this, a pull that happens in the background would never
+    // reach the visible React state until something else refreshed it.
+    const unsub = sync.onDataChanged(() => void refreshFromLocal())
+    return unsub
+  }, [refreshFromLocal])
+
+  useEffect(() => {
     // Catches a token going bad mid-session (e.g. a stale token missing a
     // scope added after it was issued) — bounces back to the sign-in gate
     // instead of leaving the app stuck showing a signed-in shell with no data.

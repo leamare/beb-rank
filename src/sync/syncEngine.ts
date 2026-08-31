@@ -2,6 +2,7 @@ import * as db from '../db/localDb'
 import * as sheets from '../sheets/sheetsClient'
 import { isSignedIn, msUntilExpiry, silentRenew } from '../auth/googleAuth'
 import type { LogEntry } from '../domain/log'
+import type { PendingAction } from '../db/localDb'
 
 const RENEW_BEFORE_MS = 10 * 60 * 1000
 
@@ -26,6 +27,19 @@ async function setState(patch: Partial<SyncState>) {
   for (const cb of listeners) cb(state)
 }
 
+const dataListeners = new Set<() => void>()
+
+/** Fired whenever local logs change as a result of a background sync pass —
+ * lets the UI refresh even though nothing the user did triggered it directly. */
+export function onDataChanged(cb: () => void): () => void {
+  dataListeners.add(cb)
+  return () => dataListeners.delete(cb)
+}
+
+function notifyDataChanged() {
+  for (const cb of dataListeners) cb()
+}
+
 async function refreshPendingCount() {
   const pending = await db.getPending()
   await setState({ pendingCount: pending.length })
@@ -40,7 +54,16 @@ export async function logPoint(entry: LogEntry): Promise<void> {
 
 export async function deleteLog(id: string): Promise<void> {
   await db.deleteLogLocal(id)
-  await db.enqueuePending({ id: `del-${id}-${Date.now()}`, kind: 'delete', entryId: id, createdAt: Date.now() })
+  // If the append for this id hasn't been sent yet, just cancel it locally —
+  // nothing to delete remotely, and it avoids an append+delete race where
+  // the append could land in the same sync pass after the delete no-ops.
+  const pending = await db.getPending()
+  const pendingAppend = pending.find((p) => p.kind === 'append' && p.entry.id === id)
+  if (pendingAppend) {
+    await db.removePending(pendingAppend.id)
+  } else {
+    await db.enqueuePending({ id: `del-${id}-${Date.now()}`, kind: 'delete', entryId: id, createdAt: Date.now() })
+  }
   await refreshPendingCount()
   void flushPending()
 }
@@ -70,47 +93,66 @@ async function flushPendingNow(): Promise<void> {
   if (pending.length === 0) return
 
   await setState({ status: 'syncing' })
-  const ordered = [...pending].sort((a, b) => a.createdAt - b.createdAt)
-  for (const action of ordered) {
-    try {
-      if (action.kind === 'append') {
-        await sheets.appendLog(action.entry)
-      } else {
-        await sheets.deleteLogRemote(action.entryId)
-      }
-      await db.removePending(action.id)
-    } catch {
-      await setState({ status: 'error' })
-      await refreshPendingCount()
-      return
+  const appends = pending.filter((p): p is Extract<PendingAction, { kind: 'append' }> => p.kind === 'append')
+  const deletes = pending.filter((p): p is Extract<PendingAction, { kind: 'delete' }> => p.kind === 'delete')
+
+  try {
+    if (appends.length > 0) {
+      await sheets.appendLogs(appends.map((a) => a.entry))
+      await Promise.all(appends.map((a) => db.removePending(a.id)))
     }
+    if (deletes.length > 0) {
+      await sheets.deleteLogsRemote(deletes.map((d) => d.entryId))
+      await Promise.all(deletes.map((d) => db.removePending(d.id)))
+    }
+    await setState({ status: 'idle' })
+  } catch {
+    await setState({ status: 'error' })
   }
-  await setState({ status: 'idle' })
   await refreshPendingCount()
 }
 
 /**
- * Pushes local entries the remote sheet doesn't have yet, beyond whatever's
- * still in the pending queue. Needed because "pending" only tracks entries
- * this device hasn't confirmed sending — it says nothing about entries this
- * device already sent to a *different* sheet before switching (e.g. two
- * devices that each had their own sheet before reconnecting to a shared
- * one). Without this, those entries stay stuck local-only forever.
+ * Pushes local-only entries into the connected sheet, but only once per
+ * (device, sheet) — covers reconnecting devices that each had their own
+ * separate history before pointing at a shared sheet. Running this on every
+ * pull (the old behavior) meant any remote deletion — including a deliberate
+ * "reset database" — got silently re-uploaded by every other device's next
+ * sync, since it kept treating "not in the last fetch" as "needs restoring".
  */
-async function pushLocalOnly(remoteLogs: LogEntry[]): Promise<void> {
+async function mergeLocalHistoryOnce(remoteLogs: LogEntry[]): Promise<LogEntry[]> {
+  const currentId = sheets.getSpreadsheetId()
+  if (!currentId) return remoteLogs
+  const mergedFor = await db.getMeta<string>('historyMergedFor')
+  if (mergedFor === currentId) return remoteLogs
+
   const remoteIds = new Set(remoteLogs.map((l) => l.id))
   const pending = await db.getPending()
   const pendingIds = new Set(pending.map((p) => (p.kind === 'append' ? p.entry.id : p.entryId)))
   const localLogs = await db.getAllLogs()
   const missing = localLogs.filter((l) => !remoteIds.has(l.id) && !pendingIds.has(l.id))
 
-  for (const entry of missing) {
+  if (missing.length > 0) {
     try {
-      await sheets.appendLog(entry)
+      await sheets.appendLogs(missing)
     } catch {
-      // leave it for the next reconciliation pass
+      return remoteLogs // retry next pull, don't mark as merged yet
     }
   }
+  await db.setMeta('historyMergedFor', currentId)
+  return missing.length > 0 ? [...remoteLogs, ...missing] : remoteLogs
+}
+
+/** Makes the local cache mirror the remote sheet exactly, except entries this
+ * device has queued but not yet confirmed sending/deleting. */
+async function reconcileLocalWithRemote(remoteLogs: LogEntry[]): Promise<void> {
+  const pending = await db.getPending()
+  const byId = new Map(remoteLogs.map((l) => [l.id, l]))
+  for (const action of pending) {
+    if (action.kind === 'append') byId.set(action.entry.id, action.entry)
+    else byId.delete(action.entryId)
+  }
+  await db.replaceAllLogs([...byId.values()])
 }
 
 let pullInFlight: Promise<LogEntry[]> | null = null
@@ -129,11 +171,12 @@ async function pullRemoteNow(): Promise<LogEntry[]> {
 
   await setState({ status: 'syncing' })
   try {
-    const [logs, config] = await Promise.all([sheets.getLogs(), sheets.getConfig()])
-    await db.putLogs(logs)
+    const [remoteLogs, config] = await Promise.all([sheets.getLogs(), sheets.getConfig()])
+    const effectiveRemote = await mergeLocalHistoryOnce(remoteLogs)
+    await reconcileLocalWithRemote(effectiveRemote)
     await db.setCachedConfig(config)
-    await pushLocalOnly(logs)
     await setState({ status: 'idle' })
+    notifyDataChanged()
     return db.getAllLogs()
   } catch {
     await setState({ status: 'error' })
