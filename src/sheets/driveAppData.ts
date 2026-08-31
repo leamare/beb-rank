@@ -1,4 +1,4 @@
-import { ensureFreshToken } from '../auth/googleAuth'
+import { ensureFreshToken, invalidateIfScopeError } from '../auth/googleAuth'
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files'
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files'
@@ -12,6 +12,7 @@ async function driveFetch(url: string, init: RequestInit = {}): Promise<Response
   })
   if (!res.ok) {
     const body = await res.text()
+    invalidateIfScopeError(res.status, body)
     throw new Error(`Drive API ${res.status}: ${body}`)
   }
   return res

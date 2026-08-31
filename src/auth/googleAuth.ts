@@ -184,6 +184,25 @@ export async function silentRenew(): Promise<boolean> {
   }
 }
 
+/**
+ * Clears a token that a request just proved is bad (e.g. missing a scope
+ * that was added after the token was issued/persisted) without trying to
+ * revoke it — the caller still needs to see the original error, this just
+ * makes sure isSignedIn() reflects reality afterward so the UI can react.
+ */
+export function invalidateToken(): void {
+  tokenState = null
+  persistToken(null)
+  notify()
+}
+
+/** Call from an API wrapper's error path: clears a stale/under-scoped token. */
+export function invalidateIfScopeError(status: number, body: string): void {
+  if (status === 403 && body.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
+    invalidateToken()
+  }
+}
+
 export function signOut(): void {
   const token = tokenState?.accessToken
   tokenState = null

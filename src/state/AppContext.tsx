@@ -58,6 +58,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    // Catches a token going bad mid-session (e.g. a stale token missing a
+    // scope added after it was issued) — bounces back to the sign-in gate
+    // instead of leaving the app stuck showing a signed-in shell with no data.
+    const unsub = auth.onAuthChange((signedIn) => {
+      if (!signedIn) setAuthStatus((prev) => (prev === 'signedIn' ? 'signedOut' : prev))
+    })
+    return unsub
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
     async function boot() {
       await refreshFromLocal()

@@ -1,4 +1,4 @@
-import { ensureFreshToken } from '../auth/googleAuth'
+import { ensureFreshToken, invalidateIfScopeError } from '../auth/googleAuth'
 import { readMarkedSpreadsheetId, writeMarkedSpreadsheetId } from './driveAppData'
 import { DEFAULT_CATEGORIES, type Category, type CategoryKey } from '../domain/categories'
 import type { LogEntry } from '../domain/log'
@@ -44,6 +44,7 @@ async function sheetsFetch(path: string, init: RequestInit = {}): Promise<Respon
   })
   if (!res.ok) {
     const body = await res.text()
+    invalidateIfScopeError(res.status, body)
     throw new Error(`Sheets API ${res.status}: ${body}`)
   }
   return res
